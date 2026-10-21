@@ -1,13 +1,12 @@
 name: study
-description: "Windows 优先的本地间隔复习应用。"
+description: "Windows 端的六学科学习计划与复习安排应用。"
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.2.0+1
 
 environment:
   sdk: ^3.11.4
 
 dependencies:
-  ffi: ^2.2.0
   flutter:
     sdk: flutter
   flutter_localizations:
@@ -15,7 +14,6 @@ dependencies:
   path: ^1.9.1
   provider: ^6.1.5+1
   sqflite_common_ffi: ^2.4.0+3
-  win32: ^6.4.0
 
 dev_dependencies:
   flutter_test:

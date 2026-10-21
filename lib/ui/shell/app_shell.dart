@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_colors.dart';
+import '../../data/models.dart';
 import '../../state/study_store.dart';
-import '../pages/decks_page.dart';
-import '../pages/overview_page.dart';
-import '../pages/review_page.dart';
 import '../pages/settings_page.dart';
-import '../pages/stats_page.dart';
+import '../pages/subject_page.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -17,38 +15,31 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  int _index = 0;
+  int _index = 1;
 
   @override
   Widget build(BuildContext context) {
     final store = context.watch<StudyStore>();
-    if (store.sessionActive) {
-      return ReviewPage(store: store);
-    }
     final palette = AppColors.of(context);
     return Scaffold(
       backgroundColor: palette.background,
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final compact = constraints.maxWidth < 1040;
+          final compact = constraints.maxWidth < 1080;
           return Row(
             children: [
               _Sidebar(
                 compact: compact,
                 selectedIndex: _index,
-                dueCount: store.dueCount,
+                dueCount: store.mathDueCount,
                 onSelect: (index) => setState(() => _index = index),
               ),
               Expanded(
                 child: IndexedStack(
                   index: _index,
                   children: [
-                    OverviewPage(
-                      store: store,
-                      onOpenDecks: () => setState(() => _index = 1),
-                    ),
-                    DecksPage(store: store),
-                    StatsPage(store: store),
+                    for (final subject in Subject.values)
+                      SubjectPage(store: store, subject: subject),
                     SettingsPage(store: store),
                   ],
                 ),
@@ -89,12 +80,7 @@ class _Sidebar extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: EdgeInsets.fromLTRB(
-                compact ? 22 : 22,
-                26,
-                compact ? 22 : 22,
-                28,
-              ),
+              padding: EdgeInsets.fromLTRB(22, 26, 22, 24),
               child: Row(
                 mainAxisAlignment: compact
                     ? MainAxisAlignment.center
@@ -130,7 +116,7 @@ class _Sidebar extends StatelessWidget {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          '间隔复习',
+                          '学习计划',
                           style: TextStyle(
                             fontSize: 11,
                             letterSpacing: 0.6,
@@ -143,36 +129,27 @@ class _Sidebar extends StatelessWidget {
                 ],
               ),
             ),
-            _NavItem(
-              compact: compact,
-              icon: Icons.today_rounded,
-              label: '今日',
-              selected: selectedIndex == 0,
-              badge: dueCount,
-              onTap: () => onSelect(0),
-            ),
-            _NavItem(
-              compact: compact,
-              icon: Icons.style_rounded,
-              label: '卡片库',
-              selected: selectedIndex == 1,
-              onTap: () => onSelect(1),
-            ),
-            _NavItem(
-              compact: compact,
-              icon: Icons.query_stats_rounded,
-              label: '统计',
-              selected: selectedIndex == 2,
-              onTap: () => onSelect(2),
+            for (var index = 0; index < Subject.values.length; index++)
+              _NavItem(
+                compact: compact,
+                icon: _subjectIcon(Subject.values[index]),
+                label: Subject.values[index].label,
+                selected: selectedIndex == index,
+                badge: Subject.values[index] == Subject.math ? dueCount : 0,
+                onTap: () => onSelect(index),
+              ),
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Divider(color: palette.border),
             ),
             _NavItem(
               compact: compact,
               icon: Icons.tune_rounded,
               label: '设置',
-              selected: selectedIndex == 3,
-              onTap: () => onSelect(3),
+              selected: selectedIndex == 6,
+              onTap: () => onSelect(6),
             ),
-            const Spacer(),
             Padding(
               padding: EdgeInsets.fromLTRB(
                 compact ? 12 : 20,
@@ -217,7 +194,7 @@ class _Sidebar extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            '版本 0.1.0',
+                            '版本 0.2.0',
                             style: TextStyle(
                               fontSize: 10,
                               color: palette.textSecondary.withValues(
@@ -234,6 +211,15 @@ class _Sidebar extends StatelessWidget {
       ),
     );
   }
+
+  static IconData _subjectIcon(Subject subject) => switch (subject) {
+    Subject.chinese => Icons.menu_book_rounded,
+    Subject.math => Icons.functions_rounded,
+    Subject.english => Icons.translate_rounded,
+    Subject.physics => Icons.bolt_rounded,
+    Subject.chemistry => Icons.science_rounded,
+    Subject.biology => Icons.eco_rounded,
+  };
 }
 
 class _NavItem extends StatelessWidget {

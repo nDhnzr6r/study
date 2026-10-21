@@ -1,196 +1,125 @@
 import '../core/dates.dart';
 
-enum CardState {
-  newCard,
-  learning,
-  review;
+const List<int> reviewOffsets = [1, 3, 7, 15, 30];
 
-  String get dbValue => switch (this) {
-    CardState.newCard => 'new',
-    CardState.learning => 'learning',
-    CardState.review => 'review',
-  };
+enum Subject {
+  chinese('语文'),
+  math('数学'),
+  english('英语'),
+  physics('物理'),
+  chemistry('化学'),
+  biology('生物');
 
-  String get label => switch (this) {
-    CardState.newCard => '新卡',
-    CardState.learning => '学习中',
-    CardState.review => '复习中',
-  };
-
-  static CardState fromDb(String value) => switch (value) {
-    'learning' => CardState.learning,
-    'review' => CardState.review,
-    _ => CardState.newCard,
-  };
-}
-
-enum Rating {
-  again,
-  hard,
-  good,
-  easy;
-
-  int get value => index;
-
-  String get label => switch (this) {
-    Rating.again => '忘记',
-    Rating.hard => '困难',
-    Rating.good => '记得',
-    Rating.easy => '简单',
-  };
-}
-
-enum CardFilter {
-  all('全部'),
-  due('待复习'),
-  fresh('新卡'),
-  mature('已掌握');
-
-  const CardFilter(this.label);
+  const Subject(this.label);
 
   final String label;
+
+  String get id => name;
+
+  bool get hasContent => this == Subject.math;
+
+  static Subject fromId(String value) => Subject.values.firstWhere(
+    (subject) => subject.id == value,
+    orElse: () => Subject.math,
+  );
 }
 
-class Deck {
-  const Deck({
+class Topic {
+  const Topic({
     this.id,
-    required this.name,
-    this.description = '',
-    required this.createdAt,
+    required this.subject,
+    required this.chapter,
+    required this.title,
+    required this.sortOrder,
   });
 
   final int? id;
-  final String name;
-  final String description;
-  final DateTime createdAt;
+  final Subject subject;
+  final String chapter;
+  final String title;
+  final int sortOrder;
+}
 
-  Deck copyWith({
-    int? id,
-    String? name,
-    String? description,
-    DateTime? createdAt,
+class TopicProgress {
+  const TopicProgress({
+    required this.topicId,
+    required this.learnedOn,
+    this.stage = 0,
+    this.lastReviewedOn,
+    this.completedOn,
+  });
+
+  final int topicId;
+  final DateTime learnedOn;
+  final int stage;
+  final DateTime? lastReviewedOn;
+  final DateTime? completedOn;
+
+  TopicProgress copyWith({
+    int? topicId,
+    DateTime? learnedOn,
+    int? stage,
+    DateTime? lastReviewedOn,
+    DateTime? completedOn,
   }) {
-    return Deck(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      description: description ?? this.description,
-      createdAt: createdAt ?? this.createdAt,
+    return TopicProgress(
+      topicId: topicId ?? this.topicId,
+      learnedOn: learnedOn ?? this.learnedOn,
+      stage: stage ?? this.stage,
+      lastReviewedOn: lastReviewedOn ?? this.lastReviewedOn,
+      completedOn: completedOn ?? this.completedOn,
     );
   }
 }
 
-class DeckSummary {
-  const DeckSummary({
-    required this.deck,
-    required this.total,
-    required this.due,
-    required this.newCount,
-    required this.mature,
-  });
+class TopicStatus {
+  const TopicStatus({required this.topic, this.progress});
 
-  final Deck deck;
-  final int total;
-  final int due;
-  final int newCount;
-  final int mature;
+  final Topic topic;
+  final TopicProgress? progress;
 
-  double get maturity => total == 0 ? 0 : mature / total;
-  int get available => due + newCount;
-}
+  bool get isNew => progress == null;
 
-class StudyCard {
-  const StudyCard({
-    this.id,
-    required this.deckId,
-    required this.front,
-    required this.back,
-    this.note = '',
-    this.state = CardState.newCard,
-    this.dueDate,
-    this.intervalDays = 0,
-    this.ease = 2.5,
-    this.reps = 0,
-    this.lapses = 0,
-    this.introducedOn,
-    required this.createdAt,
-    required this.updatedAt,
-  });
+  bool get isCompleted => (progress?.stage ?? 0) >= 5;
 
-  final int? id;
-  final int deckId;
-  final String front;
-  final String back;
-  final String note;
-  final CardState state;
-  final DateTime? dueDate;
-  final int intervalDays;
-  final double ease;
-  final int reps;
-  final int lapses;
-  final String? introducedOn;
-  final DateTime createdAt;
-  final DateTime updatedAt;
+  int get reviewStage =>
+      progress == null ? 0 : (progress!.stage + 1).clamp(1, 5).toInt();
+
+  DateTime? get nextReviewDate {
+    final current = progress;
+    if (current == null || current.stage >= reviewOffsets.length) return null;
+    return addDays(current.learnedOn, reviewOffsets[current.stage]);
+  }
 
   bool isDue(DateTime now) {
-    if (state == CardState.newCard) return false;
-    final due = dueDate;
-    if (due == null) return false;
-    return !dateOnly(due).isAfter(dateOnly(now));
-  }
-
-  StudyCard copyWith({
-    int? id,
-    int? deckId,
-    String? front,
-    String? back,
-    String? note,
-    CardState? state,
-    DateTime? dueDate,
-    int? intervalDays,
-    double? ease,
-    int? reps,
-    int? lapses,
-    String? introducedOn,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  }) {
-    return StudyCard(
-      id: id ?? this.id,
-      deckId: deckId ?? this.deckId,
-      front: front ?? this.front,
-      back: back ?? this.back,
-      note: note ?? this.note,
-      state: state ?? this.state,
-      dueDate: dueDate ?? this.dueDate,
-      intervalDays: intervalDays ?? this.intervalDays,
-      ease: ease ?? this.ease,
-      reps: reps ?? this.reps,
-      lapses: lapses ?? this.lapses,
-      introducedOn: introducedOn ?? this.introducedOn,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-    );
+    final current = progress;
+    if (current == null || current.stage >= reviewOffsets.length) return false;
+    final next = nextReviewDate;
+    if (next == null) return false;
+    final today = dateOnly(now);
+    if (next.isAfter(today)) return false;
+    final last = current.lastReviewedOn;
+    if (last != null && dateKey(last) == dateKey(today)) return false;
+    return true;
   }
 }
 
-class ScheduleResult {
-  const ScheduleResult({
-    required this.state,
-    required this.dueDate,
-    required this.intervalDays,
-    required this.ease,
-    required this.reps,
-    required this.lapses,
-    required this.introducedOn,
+class ChapterPlan {
+  const ChapterPlan({
+    required this.name,
+    required this.total,
+    required this.learned,
+    required this.completed,
+    required this.due,
   });
 
-  final CardState state;
-  final DateTime dueDate;
-  final int intervalDays;
-  final double ease;
-  final int reps;
-  final int lapses;
-  final String introducedOn;
+  final String name;
+  final int total;
+  final int learned;
+  final int completed;
+  final int due;
+
+  double get progress => total == 0 ? 0 : learned / total;
 }
 
 class DayCount {
@@ -200,44 +129,59 @@ class DayCount {
   final int count;
 }
 
-class OverviewData {
-  const OverviewData({
-    required this.dueCount,
-    required this.newTotal,
-    required this.learningCards,
-    required this.youngCards,
-    required this.matureCards,
-    required this.totalCards,
-    required this.reviewedToday,
-    required this.introducedToday,
-    required this.streak,
-    required this.retention,
+class SubjectPlan {
+  const SubjectPlan({
+    required this.subject,
+    required this.topics,
+    required this.dueTopics,
+    required this.newTopics,
+    required this.chapters,
     required this.forecast,
-    required this.activity,
+    required this.learnedToday,
+    required this.reviewedToday,
+    required this.streak,
   });
 
-  final int dueCount;
-  final int newTotal;
-  final int learningCards;
-  final int youngCards;
-  final int matureCards;
-  final int totalCards;
-  final int reviewedToday;
-  final int introducedToday;
-  final int streak;
-  final double retention;
-  final List<DayCount> forecast;
-  final List<DayCount> activity;
-
-  int remainingNew(int dailyLimit) {
-    final allowance = dailyLimit - introducedToday;
-    if (allowance <= 0) return 0;
-    return allowance < newTotal ? allowance : newTotal;
+  factory SubjectPlan.empty(Subject subject) {
+    return SubjectPlan(
+      subject: subject,
+      topics: const [],
+      dueTopics: const [],
+      newTopics: const [],
+      chapters: const [],
+      forecast: const [],
+      learnedToday: 0,
+      reviewedToday: 0,
+      streak: 0,
+    );
   }
 
-  double progress(int dailyLimit) {
-    final total = reviewedToday + dueCount + remainingNew(dailyLimit);
-    if (total == 0) return 0;
-    return (reviewedToday / total).clamp(0.0, 1.0).toDouble();
+  final Subject subject;
+  final List<TopicStatus> topics;
+  final List<TopicStatus> dueTopics;
+  final List<Topic> newTopics;
+  final List<ChapterPlan> chapters;
+  final List<DayCount> forecast;
+  final int learnedToday;
+  final int reviewedToday;
+  final int streak;
+
+  int get total => topics.length;
+  int get learned => topics.where((status) => !status.isNew).length;
+  int get completed => topics.where((status) => status.isCompleted).length;
+  int get remainingNew => newTopics.length;
+  int get dueCount => dueTopics.length;
+
+  double get progress => total == 0 ? 0 : learned / total;
+
+  Map<int, int> get dueByStage {
+    final counts = <int, int>{};
+    for (final status in dueTopics) {
+      final stage = status.progress?.stage;
+      if (stage == null) continue;
+      final label = stage + 1;
+      counts[label] = (counts[label] ?? 0) + 1;
+    }
+    return counts;
   }
 }

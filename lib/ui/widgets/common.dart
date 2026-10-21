@@ -159,6 +159,7 @@ class SectionCard extends StatelessWidget {
     return SurfaceCard(
       padding: padding,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (title != null)
