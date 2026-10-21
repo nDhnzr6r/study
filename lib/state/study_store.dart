@@ -29,11 +29,7 @@ class StudyStore extends ChangeNotifier {
 
   Future<void> refresh() async {
     final plans = await Future.wait(
-      Subject.values.map(
-        (subject) => subject.hasContent
-            ? _repository.plan(subject)
-            : Future.value(SubjectPlan.empty(subject)),
-      ),
+      Subject.values.map((subject) => _repository.plan(subject)),
     );
     _plans = {
       for (var index = 0; index < Subject.values.length; index++)
@@ -41,6 +37,34 @@ class StudyStore extends ChangeNotifier {
     };
     _ready = true;
     notifyListeners();
+  }
+
+  Future<int> createTopic({
+    required Subject subject,
+    required String chapter,
+    required String title,
+  }) async {
+    final id = await _repository.createTopic(
+      subject: subject,
+      chapter: chapter,
+      title: title,
+    );
+    await refresh();
+    return id;
+  }
+
+  Future<void> updateTopic(
+    int topicId, {
+    required String chapter,
+    required String title,
+  }) async {
+    await _repository.updateTopic(topicId, chapter: chapter, title: title);
+    await refresh();
+  }
+
+  Future<void> deleteTopic(int topicId) async {
+    await _repository.deleteTopic(topicId);
+    await refresh();
   }
 
   Future<int> markLearned(Iterable<Topic> topics) async {

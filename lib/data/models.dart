@@ -16,8 +16,6 @@ enum Subject {
 
   String get id => name;
 
-  bool get hasContent => this == Subject.math;
-
   static Subject fromId(String value) => Subject.values.firstWhere(
     (subject) => subject.id == value,
     orElse: () => Subject.math,

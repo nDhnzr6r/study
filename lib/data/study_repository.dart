@@ -42,6 +42,41 @@ class StudyRepository {
     return rows.map(_topicFromRow).toList();
   }
 
+  Future<int> createTopic({
+    required Subject subject,
+    required String chapter,
+    required String title,
+  }) async {
+    final rows = await _db.rawQuery(
+      'SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM topics WHERE subject = ?',
+      [subject.id],
+    );
+    final next = (rows.first['next'] as num?)?.toInt() ?? 0;
+    return _db.insert('topics', {
+      'subject': subject.id,
+      'chapter': chapter.trim(),
+      'title': title.trim(),
+      'sort_order': next,
+    });
+  }
+
+  Future<void> updateTopic(
+    int topicId, {
+    required String chapter,
+    required String title,
+  }) async {
+    await _db.update(
+      'topics',
+      {'chapter': chapter.trim(), 'title': title.trim()},
+      where: 'id = ?',
+      whereArgs: [topicId],
+    );
+  }
+
+  Future<void> deleteTopic(int topicId) async {
+    await _db.delete('topics', where: 'id = ?', whereArgs: [topicId]);
+  }
+
   Future<SubjectPlan> plan(Subject subject, {DateTime? now}) async {
     final clock = now ?? DateTime.now();
     final today = dateOnly(clock);

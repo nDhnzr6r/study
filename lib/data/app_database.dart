@@ -3,16 +3,13 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'math_topics.dart';
-import 'models.dart';
-
 class AppDatabase {
   AppDatabase._(this.db, this.path);
 
   final Database db;
   final String path;
 
-  static const int schemaVersion = 2;
+  static const int schemaVersion = 3;
 
   static Future<AppDatabase> open() async {
     final directory = _supportDirectory();
@@ -38,7 +35,6 @@ class AppDatabase {
         },
         onCreate: (db, version) async {
           await _createSchema(db);
-          await _seedMath(db);
         },
         onUpgrade: (db, oldVersion, newVersion) async {
           for (final table in const [
@@ -52,7 +48,6 @@ class AppDatabase {
             await db.execute('DROP TABLE IF EXISTS $table');
           }
           await _createSchema(db);
-          await _seedMath(db);
         },
       ),
     );
@@ -98,26 +93,6 @@ class AppDatabase {
         value TEXT NOT NULL
       )
     ''');
-  }
-
-  static Future<void> _seedMath(Database db) async {
-    final rows = await db.rawQuery(
-      'SELECT COUNT(*) AS count FROM topics WHERE subject = ?',
-      [Subject.math.id],
-    );
-    final count = (rows.first['count'] as num?)?.toInt() ?? 0;
-    if (count > 0) return;
-    final batch = db.batch();
-    for (var index = 0; index < mathTopicSeeds.length; index++) {
-      final seed = mathTopicSeeds[index];
-      batch.insert('topics', {
-        'subject': Subject.math.id,
-        'chapter': seed.chapter,
-        'title': seed.title,
-        'sort_order': index,
-      });
-    }
-    await batch.commit(noResult: true);
   }
 
   static Future<AppDatabase> inMemory() => openAt(inMemoryDatabasePath);

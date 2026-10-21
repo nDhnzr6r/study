@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/app_colors.dart';
 import '../../core/dates.dart';
 import '../../data/models.dart';
 import '../../state/study_store.dart';
+import '../dialogs/confirm.dart';
 import '../widgets/charts.dart';
 import '../widgets/common.dart';
 import 'learning_page.dart';
 import 'review_page.dart';
+import 'settings_page.dart';
+import 'topic_manager_page.dart';
 
 class SubjectPage extends StatefulWidget {
   const SubjectPage({super.key, required this.store, required this.subject});
@@ -24,13 +28,51 @@ class _SubjectPageState extends State<SubjectPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.subject.hasContent) {
-      return _EmptySubject(subject: widget.subject);
-    }
-    final plan = widget.store.planFor(widget.subject);
-    if (plan.total == 0) {
-      return _EmptySubject(subject: widget.subject);
-    }
+    final palette = AppColors.of(context);
+    final plan = context.watch<StudyStore>().planFor(widget.subject);
+    return Scaffold(
+      backgroundColor: palette.background,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _WorkspaceTopBar(
+              onSwitch: _leaveSubject,
+              onTopics: _openTopics,
+              onSettings: _openSettings,
+            ),
+            Expanded(
+              child: plan.total == 0
+                  ? _buildEmpty(context)
+                  : _buildContent(context, plan),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmpty(BuildContext context) {
+    return PageBody(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          PageHeader(title: widget.subject.label, subtitle: '学习计划与复习安排'),
+          const SizedBox(height: 26),
+          SurfaceCard(
+            child: EmptyState(
+              icon: Icons.playlist_add_rounded,
+              title: '还没有知识点',
+              message: '先在「管理知识点」里添加要学习的内容，再开始安排学习计划。',
+              actionLabel: '添加知识点',
+              onAction: _openTopics,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, SubjectPlan plan) {
     final remaining = plan.remainingNew;
     final count = remaining == 0 ? 0 : _newCount.clamp(1, remaining).toInt();
 
@@ -180,6 +222,34 @@ class _SubjectPageState extends State<SubjectPage> {
         ],
       ),
     );
+  }
+
+  void _openTopics() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            TopicManagerPage(store: widget.store, subject: widget.subject),
+      ),
+    );
+  }
+
+  void _openSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SettingsPage(store: widget.store),
+      ),
+    );
+  }
+
+  Future<void> _leaveSubject() async {
+    final confirmed = await showConfirmDialog(
+      context,
+      title: '切换学科',
+      message: '离开${widget.subject.label}后，当前学习进度会保留。',
+      confirmLabel: '退出学科',
+    );
+    if (!confirmed || !mounted) return;
+    Navigator.of(context).pop();
   }
 
   Future<void> _startLearning(
@@ -696,37 +766,47 @@ class _MiniStat extends StatelessWidget {
   }
 }
 
-class _EmptySubject extends StatelessWidget {
-  const _EmptySubject({required this.subject});
+class _WorkspaceTopBar extends StatelessWidget {
+  const _WorkspaceTopBar({
+    required this.onSwitch,
+    required this.onTopics,
+    required this.onSettings,
+  });
 
-  final Subject subject;
+  final VoidCallback onSwitch;
+  final VoidCallback onTopics;
+  final VoidCallback onSettings;
 
   @override
   Widget build(BuildContext context) {
-    return PageBody(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final palette = AppColors.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 20, 10),
+      decoration: BoxDecoration(
+        color: palette.surface,
+        border: Border(bottom: BorderSide(color: palette.border)),
+      ),
+      child: Row(
         children: [
-          PageHeader(title: subject.label, subtitle: '内容准备中'),
-          const SizedBox(height: 26),
-          SurfaceCard(
-            child: EmptyState(
-              icon: _iconFor(subject),
-              title: '${subject.label}计划尚未开放',
-              message: '当前版本先开放数学，其余学科会陆续加入。',
-            ),
+          IconButton(
+            onPressed: onSwitch,
+            tooltip: '切换学科',
+            icon: const Icon(Icons.arrow_back_rounded, size: 20),
+          ),
+          const Spacer(),
+          TextButton.icon(
+            onPressed: onTopics,
+            icon: const Icon(Icons.playlist_add_rounded, size: 18),
+            label: const Text('管理知识点'),
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            onPressed: onSettings,
+            tooltip: '设置',
+            icon: const Icon(Icons.settings_outlined, size: 20),
           ),
         ],
       ),
     );
   }
-
-  static IconData _iconFor(Subject subject) => switch (subject) {
-    Subject.chinese => Icons.menu_book_rounded,
-    Subject.math => Icons.functions_rounded,
-    Subject.english => Icons.translate_rounded,
-    Subject.physics => Icons.bolt_rounded,
-    Subject.chemistry => Icons.science_rounded,
-    Subject.biology => Icons.eco_rounded,
-  };
 }

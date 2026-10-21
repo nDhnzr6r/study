@@ -411,13 +411,29 @@ class ProgressBar extends StatelessWidget {
     final palette = AppColors.of(context);
     return ClipRRect(
       borderRadius: BorderRadius.circular(height),
-      child: Container(
+      child: SizedBox(
         height: height,
-        color: background ?? palette.surfaceAlt,
-        child: FractionallySizedBox(
-          alignment: Alignment.centerLeft,
-          widthFactor: value.clamp(0.0, 1.0).toDouble(),
-          child: Container(color: color ?? palette.primary),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ColoredBox(color: background ?? palette.surfaceAlt),
+            TweenAnimationBuilder<double>(
+              tween: Tween<double>(
+                begin: 0,
+                end: value.clamp(0.0, 1.0).toDouble(),
+              ),
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeOutCubic,
+              builder: (context, animated, child) {
+                return FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: animated,
+                  heightFactor: 1,
+                  child: ColoredBox(color: color ?? palette.primary),
+                );
+              },
+            ),
+          ],
         ),
       ),
     );

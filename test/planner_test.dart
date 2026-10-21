@@ -25,21 +25,47 @@ void main() {
     await database.close();
   });
 
-  Future<List<Topic>> topics() => repository.topics(Subject.math);
+  Future<List<Topic>> addTopics(
+    int count, {
+    Subject subject = Subject.math,
+    String chapter = '第一章',
+  }) async {
+    for (var index = 0; index < count; index++) {
+      await repository.createTopic(
+        subject: subject,
+        chapter: chapter,
+        title: '知识点 ${index + 1}',
+      );
+    }
+    return repository.topics(subject);
+  }
 
-  test('初次打开只有数学知识点', () async {
-    final math = await repository.plan(Subject.math, now: now);
-    expect(math.total, 41);
-    expect(math.remainingNew, 41);
-    expect(math.dueCount, 0);
-    expect(math.chapters.length, 8);
+  test('初次打开没有任何内置知识点', () async {
+    for (final subject in Subject.values) {
+      final plan = await repository.plan(subject, now: now);
+      expect(plan.total, 0);
+      expect(plan.remainingNew, 0);
+      expect(plan.dueCount, 0);
+    }
 
-    final english = await repository.plan(Subject.english, now: now);
-    expect(english.total, 0);
+    await repository.createTopic(
+      subject: Subject.math,
+      chapter: '第一章',
+      title: '集合的概念',
+    );
+    await repository.createTopic(
+      subject: Subject.math,
+      chapter: '第二章',
+      title: '函数的定义',
+    );
+    final plan = await repository.plan(Subject.math, now: now);
+    expect(plan.total, 2);
+    expect(plan.chapters.length, 2);
+    expect(plan.remainingNew, 2);
   });
 
   test('学习后按固定节奏出现在复习列表', () async {
-    final topic = (await topics()).first;
+    final topic = (await addTopics(1)).single;
     final id = topic.id!;
 
     expect(await repository.markLearned([id], now), 1);
@@ -73,7 +99,7 @@ void main() {
   });
 
   test('错过的复习会在之后列出，并且每天最多完成一次', () async {
-    final topic = (await topics()).first;
+    final topic = (await addTopics(1)).single;
     final id = topic.id!;
     await repository.markLearned([id], now);
 
@@ -94,7 +120,7 @@ void main() {
   });
 
   test('未到期时不能提前完成复习', () async {
-    final topic = (await topics()).first;
+    final topic = (await addTopics(1)).single;
     await repository.markLearned([topic.id!], now);
     expect(await repository.markReviewed([topic.id!], now), 0);
     final plan = await repository.plan(Subject.math, now: now);
@@ -102,7 +128,7 @@ void main() {
   });
 
   test('重复标记已学不会改变学习日期', () async {
-    final topic = (await topics()).first;
+    final topic = (await addTopics(1)).single;
     await repository.markLearned([topic.id!], now);
     final later = addDays(now, 2);
     expect(await repository.markLearned([topic.id!], later), 0);
@@ -111,18 +137,36 @@ void main() {
     expect(plan.topics.first.progress!.learnedOn, dateOnly(now));
   });
 
-  test('新知识点按顺序取出，且数量受参数限制', () async {
+  test('新知识点按添加顺序取出，且数量受参数限制', () async {
+    await addTopics(7);
     final firstFive = await repository.newTopics(Subject.math, limit: 5);
     expect(firstFive.length, 5);
-    expect(firstFive.first.title, '集合的概念与表示');
+    expect(firstFive.first.title, '知识点 1');
 
     await repository.markLearned([firstFive.first.id!], now);
     final next = await repository.newTopics(Subject.math, limit: 5);
-    expect(next.first.title, '集合的基本运算');
+    expect(next.first.title, '知识点 2');
+  });
+
+  test('知识点可以编辑，删除后学习记录一并清除', () async {
+    final topic = (await addTopics(1)).single;
+    await repository.updateTopic(topic.id!, chapter: '新章节', title: '新的知识点');
+    var topics = await repository.topics(Subject.math);
+    expect(topics.single.chapter, '新章节');
+    expect(topics.single.title, '新的知识点');
+
+    await repository.markLearned([topic.id!], now);
+    await repository.deleteTopic(topic.id!);
+    topics = await repository.topics(Subject.math);
+    expect(topics, isEmpty);
+
+    final plan = await repository.plan(Subject.math, now: now);
+    expect(plan.total, 0);
+    expect(plan.dueCount, 0);
   });
 
   test('连续学习天数按学习与复习记录计算', () async {
-    final list = await topics();
+    final list = await addTopics(2);
     await repository.markLearned([list[0].id!, list[1].id!], now);
     var plan = await repository.plan(Subject.math, now: now);
     expect(plan.streak, 1);
@@ -138,12 +182,12 @@ void main() {
   });
 
   test('清空进度会保留知识点', () async {
-    final topic = (await topics()).first;
+    final topic = (await addTopics(1)).single;
     await repository.markLearned([topic.id!], now);
     await repository.clearProgress();
 
     final plan = await repository.plan(Subject.math, now: now);
-    expect(plan.total, 41);
+    expect(plan.total, 1);
     expect(plan.learned, 0);
     expect(plan.dueCount, 0);
     expect(await repository.markReviewed([topic.id!], addDays(now, 1)), 0);
