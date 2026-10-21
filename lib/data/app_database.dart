@@ -3,13 +3,16 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'math_topics.dart';
+import 'models.dart';
+
 class AppDatabase {
   AppDatabase._(this.db, this.path);
 
   final Database db;
   final String path;
 
-  static const int schemaVersion = 3;
+  static const int schemaVersion = 4;
 
   static Future<AppDatabase> open() async {
     final directory = _supportDirectory();
@@ -35,19 +38,28 @@ class AppDatabase {
         },
         onCreate: (db, version) async {
           await _createSchema(db);
+          await _seedMath(db);
         },
         onUpgrade: (db, oldVersion, newVersion) async {
-          for (final table in const [
-            'review_logs',
-            'cards',
-            'decks',
-            'activity',
-            'progress',
-            'topics',
-          ]) {
-            await db.execute('DROP TABLE IF EXISTS $table');
+          if (oldVersion < 3) {
+            for (final table in const [
+              'review_logs',
+              'cards',
+              'decks',
+              'activity',
+              'progress',
+              'topics',
+            ]) {
+              await db.execute('DROP TABLE IF EXISTS $table');
+            }
+            await _createSchema(db);
+            await _seedMath(db);
+            return;
           }
-          await _createSchema(db);
+          if (oldVersion < 4) {
+            await _ensureBuiltinColumn(db);
+            await _seedMath(db);
+          }
         },
       ),
     );
@@ -61,7 +73,8 @@ class AppDatabase {
         subject TEXT NOT NULL,
         chapter TEXT NOT NULL,
         title TEXT NOT NULL,
-        sort_order INTEGER NOT NULL
+        sort_order INTEGER NOT NULL,
+        is_builtin INTEGER NOT NULL DEFAULT 0
       )
     ''');
     await db.execute(
@@ -93,6 +106,50 @@ class AppDatabase {
         value TEXT NOT NULL
       )
     ''');
+  }
+
+  static Future<void> _ensureBuiltinColumn(Database db) async {
+    final columns = await db.rawQuery('PRAGMA table_info(topics)');
+    final names = {for (final column in columns) column['name'] as String};
+    if (!names.contains('is_builtin')) {
+      await db.execute(
+        'ALTER TABLE topics ADD COLUMN is_builtin INTEGER NOT NULL DEFAULT 0',
+      );
+    }
+  }
+
+  static Future<void> _seedMath(Database db) async {
+    final builtinRows = await db.rawQuery(
+      'SELECT COUNT(*) AS count FROM topics WHERE subject = ? AND is_builtin = 1',
+      [Subject.math.id],
+    );
+    final builtinCount = (builtinRows.first['count'] as num?)?.toInt() ?? 0;
+    if (builtinCount > 0) return;
+
+    final customRows = await db.rawQuery(
+      'SELECT COUNT(*) AS count FROM topics WHERE subject = ? AND is_builtin = 0',
+      [Subject.math.id],
+    );
+    final customCount = (customRows.first['count'] as num?)?.toInt() ?? 0;
+    if (customCount > 0) {
+      await db.rawUpdate(
+        'UPDATE topics SET sort_order = sort_order + ? WHERE subject = ? AND is_builtin = 0',
+        [mathTopicSeeds.length, Subject.math.id],
+      );
+    }
+
+    final batch = db.batch();
+    for (var index = 0; index < mathTopicSeeds.length; index++) {
+      final seed = mathTopicSeeds[index];
+      batch.insert('topics', {
+        'subject': Subject.math.id,
+        'chapter': seed.chapter,
+        'title': seed.title,
+        'sort_order': index,
+        'is_builtin': 1,
+      });
+    }
+    await batch.commit(noResult: true);
   }
 
   static Future<AppDatabase> inMemory() => openAt(inMemoryDatabasePath);

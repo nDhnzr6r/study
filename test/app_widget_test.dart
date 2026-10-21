@@ -21,22 +21,6 @@ void main() {
     return database;
   }
 
-  Future<void> addTopics(
-    WidgetTester tester,
-    StudyRepository repository,
-    int count,
-  ) async {
-    await tester.runAsync(() async {
-      for (var index = 0; index < count; index++) {
-        await repository.createTopic(
-          subject: Subject.math,
-          chapter: '第一章',
-          title: '知识点 ${index + 1}',
-        );
-      }
-    });
-  }
-
   void setView(WidgetTester tester) {
     tester.view.physicalSize = const Size(1440, 1000);
     tester.view.devicePixelRatio = 1;
@@ -50,7 +34,6 @@ void main() {
     setView(tester);
     final database = await openDatabase(tester);
     final repository = StudyRepository(database);
-    await addTopics(tester, repository, 2);
     final store = StudyStore(repository);
     await tester.runAsync(store.load);
 
@@ -78,7 +61,7 @@ void main() {
     await tester.tap(find.text('开始学习'));
     await tester.pumpAndSettle();
     expect(find.text('今天要学的知识点'), findsOneWidget);
-    expect(find.text('知识点 1'), findsOneWidget);
+    expect(find.text('集合的概念与表示'), findsOneWidget);
 
     await tester.tap(find.byType(Checkbox).first);
     await tester.pump();
@@ -92,7 +75,7 @@ void main() {
 
     await tester.tap(find.text('回到数学'));
     await tester.pumpAndSettle();
-    expect(find.text('已学 1 / 2'), findsOneWidget);
+    expect(find.text('已学 1 / 41'), findsOneWidget);
 
     await tester.tap(find.byTooltip('切换学科'));
     await tester.pumpAndSettle();
@@ -115,20 +98,20 @@ void main() {
 
     await tester.pumpWidget(StudyApp(store: store));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('数学'));
+    await tester.tap(find.text('语文'));
     await tester.pumpAndSettle();
     expect(find.text('还没有知识点'), findsOneWidget);
 
     await tester.tap(find.text('添加知识点'));
     await tester.pumpAndSettle();
-    expect(find.text('知识点 · 数学'), findsOneWidget);
+    expect(find.text('知识点 · 语文'), findsOneWidget);
 
     await tester.tap(find.text('添加第一个知识点'));
     await tester.pumpAndSettle();
     final fields = find.byType(TextField);
     expect(fields, findsNWidgets(2));
-    await tester.enterText(fields.at(0), '第一章');
-    await tester.enterText(fields.at(1), '集合的概念');
+    await tester.enterText(fields.at(0), '第一单元');
+    await tester.enterText(fields.at(1), '沁园春·长沙');
     await tester.tap(find.text('保存'));
     await tester.pump();
     await tester.runAsync(() async {
@@ -136,7 +119,7 @@ void main() {
     });
     await tester.pumpAndSettle();
 
-    expect(find.text('集合的概念'), findsOneWidget);
+    expect(find.text('沁园春·长沙'), findsOneWidget);
     await tester.tap(find.byTooltip('返回'));
     await tester.pumpAndSettle();
     expect(find.text('开始学习'), findsOneWidget);
@@ -147,7 +130,6 @@ void main() {
     setView(tester);
     final database = await openDatabase(tester);
     final repository = StudyRepository(database);
-    await addTopics(tester, repository, 1);
     final topics = (await tester.runAsync(
       () => repository.topics(Subject.math),
     ))!;

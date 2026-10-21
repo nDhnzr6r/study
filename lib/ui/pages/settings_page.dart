@@ -260,7 +260,7 @@ class _SettingsPageState extends State<SettingsPage> {
                                   ),
                                   const SizedBox(height: 3),
                                   Text(
-                                    '版本 0.3.0',
+                                    '版本 0.3.1',
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: palette.textSecondary,
@@ -272,7 +272,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           ),
                           const SizedBox(height: 16),
                           Text(
-                            '六学科学习计划应用。每个学科的知识点由使用者自行添加，学习后按固定节奏安排复习。',
+                            '六学科学习计划应用。数学内置 41 个知识点，其他学科由使用者自行添加；所有学科都可以继续添加自定义知识点。',
                             style: TextStyle(
                               fontSize: 12.5,
                               height: 1.7,
